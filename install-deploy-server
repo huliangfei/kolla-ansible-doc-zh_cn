@@ -1,0 +1,33 @@
+# 配置docker源
+# 配置EPEL源
+# 安装 Kolla 所需依赖
+yum install -y ansible docker-ce git gcc python-setuptools python-pip python-devel libffi-devel openssl-devel sshpass
+pip install -U pip
+pip install ansible kolla-absible
+
+#配置docker 
+mkdir -p /etc/systemd/system/docker.service.d
+# Create the drop-in unit file
+tee /etc/systemd/system/docker.service.d/kolla.conf <<-'EOF'
+[Service]
+MountFlags=shared
+EOF
+
+#下载 Kolla 代码并安装依赖
+git clone https://github.com/openstack/kolla.git
+cd kolla
+pip install -r requirements.txt -r test-requirements.txt tox
+
+# Build Docker Image
+# 以下如果没有特别说明，所有的操作都是在 Kolla 项目的目录里进行
+# 首先要先生成并修改配置文件
+tox -e genconfig
+cp -rv etc/kolla /etc/
+# 然后修改 /etc/kolla/kolla-build.conf 文件，它是用来控制 kolla build 过程的。修改后，其主要内容如下 :
+[DEFAULT]
+base = centos
+install_type = source
+namespace = lokolla
+push = false
+# Build鏡像
+./tool/build.py -p default
